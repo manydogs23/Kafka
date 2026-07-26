@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew install *)",
+      "Bash(/usr/libexec/java_home -v 21)",
+      "Bash(JAVA_HOME=$\\(/usr/libexec/java_home -v 21\\) mvn -q -DskipTests compile)",
+      "Bash(echo \"EXIT:$?\")"
+    ]
+  }
+}
