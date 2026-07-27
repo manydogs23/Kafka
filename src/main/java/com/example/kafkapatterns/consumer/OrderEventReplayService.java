@@ -1,6 +1,6 @@
 package com.example.kafkapatterns.consumer;
 
-import com.example.kafkapatterns.config.KafkaTopics;
+import com.example.kafkapatterns.config.MessagingRulesProperties;
 import com.example.kafkapatterns.dto.OrderEvent;
 import com.example.kafkapatterns.state.OrderStateStore;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -21,15 +21,8 @@ import java.util.Properties;
 import java.util.UUID;
 
 /**
- * Kafka-native REPLAYABILITY demo.
- *
- * Spins up a throwaway consumer with a brand-new, never-seen-before group
- * id, assigns it every partition of {@code order-events-topic} directly
- * (bypassing group-coordinated subscription), and seeks to offset 0 on each
- * one. Because the topic has infinite retention (see {@link
- * com.example.kafkapatterns.config.KafkaTopicConfig}), the entire history is
- * still there to read -- this is the capability a RabbitMQ queue fundamentally
- * does not have once a message is acked and deleted.
+ * Replay from offset 0 using a disposable group id
+ * ({@code messaging.groups.order-replay-prefix} + UUID).
  */
 @Service
 public class OrderEventReplayService {
@@ -38,30 +31,35 @@ public class OrderEventReplayService {
 
     private final ConsumerFactory<Object, Object> consumerFactory;
     private final OrderStateStore orderStateStore;
+    private final MessagingRulesProperties rules;
 
-    public OrderEventReplayService(ConsumerFactory<Object, Object> consumerFactory, OrderStateStore orderStateStore) {
+    public OrderEventReplayService(ConsumerFactory<Object, Object> consumerFactory,
+                                   OrderStateStore orderStateStore,
+                                   MessagingRulesProperties rules) {
         this.consumerFactory = consumerFactory;
         this.orderStateStore = orderStateStore;
+        this.rules = rules;
     }
 
     public Map<String, List<OrderEvent>> replayFromBeginning() {
         orderStateStore.reset();
 
+        String topic = rules.getTopics().getOrderEvents();
+        String groupId = rules.getGroups().getOrderReplayPrefix() + UUID.randomUUID();
+
         Properties overrides = new Properties();
-        // Unique, disposable group id: this replay must never share -- or
-        // disturb -- the committed offsets of the live "order-events-live" group.
-        overrides.put(ConsumerConfig.GROUP_ID_CONFIG, "order-events-replay-" + UUID.randomUUID());
+        overrides.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         overrides.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
         try (Consumer<Object, Object> consumer = consumerFactory.createConsumer(null, null, null, overrides)) {
-            List<TopicPartition> partitions = consumer.partitionsFor(KafkaTopics.ORDER_EVENTS_TOPIC).stream()
+            List<TopicPartition> partitions = consumer.partitionsFor(topic).stream()
                     .map(PartitionInfo::partition)
-                    .map(partition -> new TopicPartition(KafkaTopics.ORDER_EVENTS_TOPIC, partition))
+                    .map(partition -> new TopicPartition(topic, partition))
                     .toList();
 
             consumer.assign(partitions);
-            consumer.seekToBeginning(partitions); // rewind every partition to offset 0
+            consumer.seekToBeginning(partitions);
 
             int replayedCount = 0;
             boolean keepPolling = true;
@@ -77,8 +75,8 @@ public class OrderEventReplayService {
                 }
             }
 
-            log.info("[replay] rebuilt state from offset 0: {} events across {} partitions",
-                    replayedCount, partitions.size());
+            log.info("[replay] group={} rebuilt state from offset 0: {} events across {} partitions",
+                    groupId, replayedCount, partitions.size());
             return orderStateStore.snapshot();
         }
     }

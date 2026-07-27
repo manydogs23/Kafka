@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User C — Numbers</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge kafka">Kafka-style · Producer</span>
+      <h1>User C</h1>
+      <p>Type a number and submit. User D will only see it after pulling.</p>
+    </header>
+
+    <section class="panel">
+      <label for="number">Number</label>
+      <input id="number" type="number" step="any" placeholder="42" />
+      <div class="row">
+        <button id="send" class="kafka" type="button">Submit</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <p class="nav"><a href="/">← Home</a> · <a href="/kafka-d.html">D</a> · <a href="/kafka-d1.html">D1</a> · <a href="/kafka-d2.html">D2</a></p>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    document.getElementById('send').addEventListener('click', async () => {
+      const number = document.getElementById('number').value.trim();
+      if (!number) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Please enter a number.';
+        return;
+      }
+      statusEl.className = 'status';
+      statusEl.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/v1/demo/kafka/numbers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const body = await res.json();
+        statusEl.className = 'status ok';
+        statusEl.textContent = 'Accepted · details=' + body.details;
+        document.getElementById('number').value = '';
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Failed: ' + e.message;
+      }
+    });
+  </script>
+</body>
+</html>
