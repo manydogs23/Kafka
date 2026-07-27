@@ -4,17 +4,29 @@
 
 The service is a single Spring Boot process that talks to one Kafka broker. What changes between the three patterns is never the transport — it's **partition key presence** and **consumer group topology**.
 
+A browser demo layer sits on top of two of those patterns:
+
+- **RabbitMQ-style fanout → push to User B** (SSE via `RabbitPushHub`)
+- **Kafka-native event log → pull by User D** (in-memory `KafkaPullBuffer`)
+
+See also [DEMO_DATAFLOWS.md](DEMO_DATAFLOWS.md) for the A/B/C/D page sequences.
+
 ```mermaid
 flowchart TB
     subgraph Clients["Callers"]
+        Browser["Browser demo<br/>Users A/B/C/D"]
         REST["REST client<br/>(curl / Postman)"]
         NodeProd["Node.js client<br/>(kafkajs producer)"]
     end
 
     subgraph App["Spring Boot 4 app :8080"]
+        DemoCtrl["DemoController<br/>/api/v1/demo/*"]
         RabbitCtrl["RabbitMqStyleController<br/>/api/v1/rabbitmq/*"]
         StreamCtrl["KafkaStreamController<br/>/api/v1/kafka/stream*"]
         Producer["KafkaProducerService"]
+
+        Hub["RabbitPushHub<br/>(SSE)"]
+        Buf["KafkaPullBuffer<br/>(drain-on-pull)"]
 
         W1["QueueWorkerListener<br/>workerOne()"]
         W2["QueueWorkerListener<br/>workerTwo()"]
@@ -35,12 +47,17 @@ flowchart TB
         NC["consume-worker / consume-analytics /<br/>consume-notifications"]
     end
 
+    Browser --> DemoCtrl
     REST --> RabbitCtrl
     REST --> StreamCtrl
+    REST --> DemoCtrl
     NodeProd -. "direct kafkajs produce\n(+ __TypeId__ header)" .-> T1
     NodeProd -.-> T2
     NodeProd -.-> T3
 
+    DemoCtrl --> Producer
+    DemoCtrl --> Hub
+    DemoCtrl --> Buf
     RabbitCtrl --> Producer
     StreamCtrl --> Producer
     Producer -- "no key, round-robin" --> T1
@@ -58,6 +75,9 @@ flowchart TB
     T3 -- "groupId=order-events-live-group" --> OE
     T3 -- "disposable groupId, seekToBeginning" --> Replay
     OE --> Store
+    OE --> Buf
+    FN --> Hub
+    Hub -. "SSE push" .-> Browser
     Replay --> Store
 
     StreamCtrl -. "GET /stream/replay" .-> Replay
@@ -74,6 +94,8 @@ flowchart TB
 | `retention.ms = -1` | `KafkaTopicConfig` | Without infinite retention, replay-from-0 would eventually hit deleted segments |
 | Separate MANUAL-ack container factory | `KafkaConsumerConfig` | Only the log-style listener commits after applying state; queue/fanout use Boot's default auto-ack |
 | Disposable, UUID-suffixed group id for replay | `OrderEventReplayService` | Must never collide with, or perturb, the live listener's committed offsets |
+| SSE push only from `group-notifications` | `FanoutListener` → `RabbitPushHub` | One browser delivery per fanout message (analytics still logs its own copy) |
+| Pull buffer for `NUMBER` events | `OrderEventListener` → `KafkaPullBuffer` | Lets User D explicitly pull; demo of poll/fetch vs auto push |
 
 ---
 
@@ -109,18 +131,20 @@ sequenceDiagram
 
 ### 2.2 RabbitMQ-style pub/sub fanout (`broadcast-topic`)
 
-Two listeners use *different* `groupId`s. Kafka tracks committed offsets independently per group, so both receive a full, independent copy of every message.
+Two listeners use *different* `groupId`s. Kafka tracks committed offsets independently per group, so both receive a full, independent copy of every message. The notifications listener also pushes to User B over SSE.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant Ctrl as RabbitMqStyleController
+    participant Ctrl as RabbitMqStyleController / DemoController
     participant P as KafkaProducerService
     participant K as broadcast-topic
     participant GA as group-analytics
     participant GN as group-notifications
+    participant Hub as RabbitPushHub
+    participant B as User B (SSE)
 
-    C->>Ctrl: POST /api/v1/rabbitmq/fanout {content}
+    C->>Ctrl: POST /api/v1/rabbitmq/fanout {content}<br/>or POST /api/v1/demo/rabbit/words {words}
     Ctrl->>Ctrl: build BroadcastMessage(eventId, content, now())
     Ctrl->>P: sendBroadcast(message)
     P->>K: send(topic, message)  // no key
@@ -132,6 +156,8 @@ sequenceDiagram
     and
         K->>GN: deliver record
         GN->>GN: log "[group-notifications] received"
+        GN->>Hub: push(payload)
+        Hub-->>B: SSE event "message"
     end
 
     Note over GA,GN: Same offset, same message,<br/>two independent read positions
@@ -139,19 +165,20 @@ sequenceDiagram
 
 ### 2.3 Kafka-native event log: append + live consumption (`order-events-topic`)
 
-Events are keyed by `orderId`. The live listener uses **manual** acknowledgment, committing only after state has been applied — not before, and not automatically on a timer.
+Events are keyed by `orderId`. The live listener uses **manual** acknowledgment, committing only after state has been applied — not before, and not automatically on a timer. Demo `NUMBER` events are also offered to `KafkaPullBuffer` for User D.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant Ctrl as KafkaStreamController
+    participant Ctrl as KafkaStreamController / DemoController
     participant P as KafkaProducerService
     participant K as order-events-topic
     participant L as OrderEventListener
     participant S as OrderStateStore
+    participant Buf as KafkaPullBuffer
 
-    C->>Ctrl: POST /api/v1/kafka/stream {orderId, eventType, details}
-    Ctrl->>Ctrl: build OrderEvent(orderId, eventType, details, now())
+    C->>Ctrl: POST /api/v1/kafka/stream {orderId, eventType, details}<br/>or POST /api/v1/demo/kafka/numbers {number}
+    Ctrl->>Ctrl: build OrderEvent(...)
     Ctrl->>P: sendOrderEvent(orderId, event)
     P->>K: send(topic, key=orderId, event)
     Ctrl-->>C: 202 Accepted (OrderEvent)
@@ -160,6 +187,9 @@ sequenceDiagram
     activate L
     L->>S: apply(event)
     S->>S: eventsByOrder[orderId].add(event)
+    opt eventType == NUMBER
+        L->>Buf: offer({ number, offset, … })
+    end
     L->>K: ack.acknowledge()  // manual commit, AFTER apply
     deactivate L
 ```
@@ -194,3 +224,12 @@ sequenceDiagram
 
     Note over R,K: Disposable group id never touches<br/>order-events-live-group's committed offsets
 ```
+
+### 2.5 Browser demo: push vs pull
+
+Teaching UX on top of §§2.2 and 2.3. Full diagrams live in [DEMO_DATAFLOWS.md](DEMO_DATAFLOWS.md).
+
+| Demo | Producer | Broker path | Consumer UX |
+|---|---|---|---|
+| RabbitMQ-style push | User A → `POST /api/v1/demo/rabbit/words` | `broadcast-topic` → `FanoutListener` → `RabbitPushHub` | User B: SSE auto-update |
+| Kafka-style pull | User C → `POST /api/v1/demo/kafka/numbers` | `order-events-topic` → `OrderEventListener` → `KafkaPullBuffer` | User D: `GET /api/v1/demo/kafka/pull` |

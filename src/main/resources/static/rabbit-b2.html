@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User B2 — Live</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge rabbit">Fanout · Consumer (auto push)</span>
+      <h1>User B2</h1>
+      <p>Same SSE hub as B and B1 — every broadcast from A appears here automatically.</p>
+    </header>
+    <section class="panel">
+      <div id="status" class="status">Connecting…</div>
+      <ul id="feed" class="feed"></ul>
+    </section>
+    <p class="nav"><a href="/">← Home</a> · <a href="/rabbit-a.html">User A</a> · <a href="/rabbit-b.html">B</a> · <a href="/rabbit-b1.html">B1</a></p>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const feed = document.getElementById('feed');
+    function addItem(words, when) {
+      const li = document.createElement('li');
+      li.textContent = words;
+      const time = document.createElement('time');
+      time.textContent = when || new Date().toISOString();
+      li.appendChild(time);
+      feed.prepend(li);
+    }
+    const es = new EventSource('/api/v1/demo/rabbit/live');
+    es.addEventListener('connected', () => {
+      statusEl.className = 'status ok';
+      statusEl.textContent = 'Connected · waiting for User A…';
+    });
+    es.addEventListener('message', (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        addItem(data.words, data.occurredAt);
+        statusEl.className = 'status ok';
+        statusEl.textContent = 'Last delivery: ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Bad payload';
+      }
+    });
+    es.onerror = () => {
+      statusEl.className = 'status err';
+      statusEl.textContent = 'Disconnected — retrying…';
+    };
+  </script>
+</body>
+</html>

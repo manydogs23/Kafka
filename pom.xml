@@ -26,7 +26,13 @@
     </properties>
 
     <dependencies>
-        <!-- REST endpoints used to trigger each messaging pattern -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- REST + static demo pages (Users A/B/C/D) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

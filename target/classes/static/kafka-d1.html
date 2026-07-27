@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User D1 — Pull</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge kafka">Event log · Pull · group demo-order-pull-d1</span>
+      <h1>User D1</h1>
+      <p>Different groupId from D/D2 — still receives every NUMBER event (own cursor).</p>
+    </header>
+    <section class="panel">
+      <div class="row">
+        <button id="pull" class="kafka" type="button">Fetch / Pull</button>
+        <button id="clear" class="secondary" type="button">Clear list</button>
+      </div>
+      <div id="status" class="status">Idle — click Fetch when ready.</div>
+      <ul id="feed" class="feed"></ul>
+    </section>
+    <p class="nav"><a href="/">← Home</a> · <a href="/kafka-c.html">User C</a> · <a href="/kafka-d.html">D</a> · <a href="/kafka-d2.html">D2</a></p>
+  </div>
+  <script>
+    const USER = 'd1';
+    const statusEl = document.getElementById('status');
+    const feed = document.getElementById('feed');
+    function addItem(number, when, offset) {
+      const li = document.createElement('li');
+      li.textContent = 'number=' + number + (offset != null ? ' · offset=' + offset : '');
+      const time = document.createElement('time');
+      time.textContent = when || new Date().toISOString();
+      li.appendChild(time);
+      feed.prepend(li);
+    }
+    document.getElementById('clear').addEventListener('click', () => {
+      feed.innerHTML = '';
+      statusEl.className = 'status';
+      statusEl.textContent = 'List cleared.';
+    });
+    document.getElementById('pull').addEventListener('click', async () => {
+      statusEl.className = 'status';
+      statusEl.textContent = 'Pulling…';
+      try {
+        const res = await fetch('/api/v1/demo/kafka/pull/' + USER);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const body = await res.json();
+        const messages = body.messages || [];
+        messages.forEach((m) => addItem(m.number, m.occurredAt, m.offset));
+        statusEl.className = 'status ok';
+        statusEl.textContent = messages.length
+          ? 'Pulled ' + messages.length + ' message(s) for inbox ' + USER + '.'
+          : 'No new messages for ' + USER + '.';
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Failed: ' + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

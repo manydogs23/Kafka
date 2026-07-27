@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Messaging Demo</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Producer / Consumer demo</h1>
+      <p>
+        Open users in separate tabs.
+        Fanout: A → B/B1/B2 (all get every message).
+        Event log: C → D/D1/D2 (each group pulls its own copy).
+        Work queue: F → E1 <em>or</em> E2 (exactly one worker per task).
+      </p>
+    </header>
+
+    <div class="cards">
+      <a class="card" href="/rabbit-a.html">
+        <span class="badge rabbit">Fanout · Producer</span>
+        <h2>User A — type words</h2>
+        <p>Broadcast to broadcast-topic.</p>
+      </a>
+      <a class="card" href="/rabbit-b.html">
+        <span class="badge rabbit">Fanout · Push</span>
+        <h2>User B — live inbox</h2>
+        <p>Auto-receive (same SSE hub as B1/B2).</p>
+      </a>
+      <a class="card" href="/rabbit-b1.html">
+        <span class="badge rabbit">Fanout · Push</span>
+        <h2>User B1 — live inbox</h2>
+        <p>Same stream as B — also gets every broadcast.</p>
+      </a>
+      <a class="card" href="/rabbit-b2.html">
+        <span class="badge rabbit">Fanout · Push</span>
+        <h2>User B2 — live inbox</h2>
+        <p>Same stream as B — also gets every broadcast.</p>
+      </a>
+
+      <a class="card" href="/kafka-c.html">
+        <span class="badge kafka">Event log · Producer</span>
+        <h2>User C — type numbers</h2>
+        <p>Append to order-events-topic.</p>
+      </a>
+      <a class="card" href="/kafka-d.html">
+        <span class="badge kafka">Event log · Pull · group d</span>
+        <h2>User D — pull inbox</h2>
+        <p>Own Kafka group — sees every number.</p>
+      </a>
+      <a class="card" href="/kafka-d1.html">
+        <span class="badge kafka">Event log · Pull · group d1</span>
+        <h2>User D1 — pull inbox</h2>
+        <p>Different groupId — also sees every number.</p>
+      </a>
+      <a class="card" href="/kafka-d2.html">
+        <span class="badge kafka">Event log · Pull · group d2</span>
+        <h2>User D2 — pull inbox</h2>
+        <p>Different groupId — also sees every number.</p>
+      </a>
+
+      <a class="card" href="/queue-f.html">
+        <span class="badge rabbit">Work queue · Producer</span>
+        <h2>User F — submit task</h2>
+        <p>Publish to task-queue-topic (competing workers).</p>
+      </a>
+      <a class="card" href="/queue-e1.html">
+        <span class="badge rabbit">Work queue · Push · worker-1</span>
+        <h2>User E1 — live (push)</h2>
+        <p>Only tasks handled by worker-instance-1.</p>
+      </a>
+      <a class="card" href="/queue-e2.html">
+        <span class="badge kafka">Work queue · Pull · worker-2</span>
+        <h2>User E2 — pull inbox</h2>
+        <p>Only tasks handled by worker-instance-2.</p>
+      </a>
+    </div>
+  </div>
+</body>
+</html>

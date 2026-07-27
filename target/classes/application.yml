@@ -5,8 +5,12 @@ spring:
   application:
     name: kafka-messaging-patterns
 
+  # Load topic / group / user rules from an external file (not hardcoded Java).
+  config:
+    import: classpath:rules.yml
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: 10.105.123.8:9092
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

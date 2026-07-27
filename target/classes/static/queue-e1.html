@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User E1 — Push</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge rabbit">Work queue · Push · worker-instance-1</span>
+      <h1>User E1</h1>
+      <p>Auto-receive tasks handled by worker-instance-1 only. E2 will not get the same task.</p>
+    </header>
+    <section class="panel">
+      <div id="status" class="status">Connecting…</div>
+      <ul id="feed" class="feed"></ul>
+    </section>
+    <p class="nav"><a href="/">← Home</a> · <a href="/queue-f.html">User F</a> · <a href="/queue-e2.html">User E2</a></p>
+  </div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const feed = document.getElementById('feed');
+    function addItem(data) {
+      const li = document.createElement('li');
+      li.textContent = data.payload + ' · ' + data.worker + ' · p' + data.partition;
+      const time = document.createElement('time');
+      time.textContent = data.occurredAt || new Date().toISOString();
+      li.appendChild(time);
+      feed.prepend(li);
+    }
+    const es = new EventSource('/api/v1/demo/queue/live');
+    es.addEventListener('connected', () => {
+      statusEl.className = 'status ok';
+      statusEl.textContent = 'Connected · waiting for tasks on worker-1…';
+    });
+    es.addEventListener('message', (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        addItem(data);
+        statusEl.className = 'status ok';
+        statusEl.textContent = 'Last delivery: ' + new Date().toLocaleTimeString();
+      } catch (e) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Bad payload';
+      }
+    });
+    es.onerror = () => {
+      statusEl.className = 'status err';
+      statusEl.textContent = 'Disconnected — retrying…';
+    };
+  </script>
+</body>
+</html>
