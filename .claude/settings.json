@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn -q compile)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Bash(docker info *)",
+      "Bash(tail -n 60 /tmp/app.log)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"GET /footprint-g.html -> HTTP_%{http_code}\\\\n\" http://localhost:8080/footprint-g.html)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> HTTP_%{http_code}\\\\n\" http://localhost:8080/)",
+      "Bash(curl -s -X POST http://localhost:8080/api/v1/footprint -H 'Content-Type: application/json' -d '{\"userId\":\"user-42\",\"action\":\"LOGIN\",\"details\":\"web\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/v1/footprint -H 'Content-Type: application/json' -d '{\"userId\":\"user-42\",\"action\":\"PAGE_VIEW\",\"details\":\"/checkout\"}')",
+      "Bash(curl -s http://localhost:8080/api/v1/footprint/user-42)",
+      "Bash(curl -s http://localhost:8080/api/v1/footprint/replay)"
+    ]
+  }
+}

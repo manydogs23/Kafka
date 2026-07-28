@@ -53,6 +53,7 @@ public class MessagingRulesProperties {
         private String taskQueue;
         private String broadcast;
         private String orderEvents;
+        private String userFootprint;
 
         public String getTaskQueue() {
             return taskQueue;
@@ -77,12 +78,21 @@ public class MessagingRulesProperties {
         public void setOrderEvents(String orderEvents) {
             this.orderEvents = orderEvents;
         }
+
+        public String getUserFootprint() {
+            return userFootprint;
+        }
+
+        public void setUserFootprint(String userFootprint) {
+            this.userFootprint = userFootprint;
+        }
     }
 
     public static class Partitions {
         private int taskQueue = 3;
         private int broadcast = 3;
         private int orderEvents = 3;
+        private int userFootprint = 3;
 
         public int getTaskQueue() {
             return taskQueue;
@@ -107,6 +117,14 @@ public class MessagingRulesProperties {
         public void setOrderEvents(int orderEvents) {
             this.orderEvents = orderEvents;
         }
+
+        public int getUserFootprint() {
+            return userFootprint;
+        }
+
+        public void setUserFootprint(int userFootprint) {
+            this.userFootprint = userFootprint;
+        }
     }
 
     public static class Groups {
@@ -116,6 +134,8 @@ public class MessagingRulesProperties {
         private String orderLive;
         private Map<String, String> orderPull = new LinkedHashMap<>();
         private String orderReplayPrefix;
+        private String userFootprintLive;
+        private String userFootprintReplayPrefix;
 
         public String getWorker() {
             return worker;
@@ -163,6 +183,22 @@ public class MessagingRulesProperties {
 
         public void setOrderReplayPrefix(String orderReplayPrefix) {
             this.orderReplayPrefix = orderReplayPrefix;
+        }
+
+        public String getUserFootprintLive() {
+            return userFootprintLive;
+        }
+
+        public void setUserFootprintLive(String userFootprintLive) {
+            this.userFootprintLive = userFootprintLive;
+        }
+
+        public String getUserFootprintReplayPrefix() {
+            return userFootprintReplayPrefix;
+        }
+
+        public void setUserFootprintReplayPrefix(String userFootprintReplayPrefix) {
+            this.userFootprintReplayPrefix = userFootprintReplayPrefix;
         }
     }
 

@@ -4,6 +4,7 @@ import com.example.kafkapatterns.config.MessagingRulesProperties;
 import com.example.kafkapatterns.dto.BroadcastMessage;
 import com.example.kafkapatterns.dto.OrderEvent;
 import com.example.kafkapatterns.dto.TaskMessage;
+import com.example.kafkapatterns.dto.UserFootprintEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -51,5 +52,11 @@ public class KafkaProducerService {
         String topic = rules.getTopics().getOrderEvents();
         kafkaTemplate.send(topic, orderId, event);
         log.info("-> [{}] {} for order {}", topic, event.eventType(), orderId);
+    }
+
+    public void sendUserFootprintEvent(String userId, UserFootprintEvent event) {
+        String topic = rules.getTopics().getUserFootprint();
+        kafkaTemplate.send(topic, userId, event);
+        log.info("-> [{}] {} for user {}", topic, event.action(), userId);
     }
 }

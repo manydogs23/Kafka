@@ -15,6 +15,7 @@
         Fanout: A → B/B1/B2 (all get every message).
         Event log: C → D/D1/D2 (each group pulls its own copy).
         Work queue: F → E1 <em>or</em> E2 (exactly one worker per task).
+        Footprint: G logs actions per userId and reads them back live or via full replay — and every A-F action logs its own footprint too.
       </p>
     </header>
 
@@ -75,6 +76,12 @@
         <span class="badge kafka">Work queue · Pull · worker-2</span>
         <h2>User E2 — pull inbox</h2>
         <p>Only tasks handled by worker-instance-2.</p>
+      </a>
+
+      <a class="card" href="/footprint-g.html">
+        <span class="badge kafka">Event log · userId-keyed</span>
+        <h2>User G — operating footprint</h2>
+        <p>Log actions per userId; also aggregates footprint events from every A-F action automatically. Read one user's trail live, all users, or replay from offset 0.</p>
       </a>
     </div>
   </div>
