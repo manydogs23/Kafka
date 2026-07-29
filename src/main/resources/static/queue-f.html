@@ -16,6 +16,9 @@
     <section class="panel">
       <label for="payload">Task payload</label>
       <textarea id="payload" placeholder="Do something useful"></textarea>
+      <label for="key" class="stacked">Key (optional)</label>
+      <input id="key" type="text" placeholder="e.g. customer-7 — leave blank for round-robin" />
+      <p class="hint">Blank key: task is round-robined across partitions (spreads load, no ordering). Same key every time: Kafka hashes it to the same partition, so tasks with that key always go to the same worker, in order.</p>
       <div class="row">
         <button id="send" type="button">Submit task</button>
       </div>
@@ -27,6 +30,7 @@
     const statusEl = document.getElementById('status');
     document.getElementById('send').addEventListener('click', async () => {
       const payload = document.getElementById('payload').value.trim();
+      const key = document.getElementById('key').value.trim();
       if (!payload) {
         statusEl.className = 'status err';
         statusEl.textContent = 'Please enter a task payload.';
@@ -38,12 +42,12 @@
         const res = await fetch('/api/v1/demo/queue/tasks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payload })
+          body: JSON.stringify({ payload, key })
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const body = await res.json();
         statusEl.className = 'status ok';
-        statusEl.textContent = 'Accepted · taskId=' + body.taskId;
+        statusEl.textContent = 'Accepted · taskId=' + body.taskId + (key ? ' · key=' + key : ' · no key (round-robin)');
         document.getElementById('payload').value = '';
       } catch (e) {
         statusEl.className = 'status err';

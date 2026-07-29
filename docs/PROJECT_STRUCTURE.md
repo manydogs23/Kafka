@@ -131,7 +131,7 @@ Kafka/
 | D | `/kafka-d.html` | `GET /api/v1/demo/kafka/pull/d` | Pull inbox `d` |
 | D1 | `/kafka-d1.html` | `GET /api/v1/demo/kafka/pull/d1` | Pull inbox `d1` |
 | D2 | `/kafka-d2.html` | `GET /api/v1/demo/kafka/pull/d2` | Pull inbox `d2` |
-| F | `/queue-f.html` | `POST /api/v1/demo/queue/tasks` | Produce work-queue tasks |
+| F | `/queue-f.html` | `POST /api/v1/demo/queue/tasks` | Produce work-queue tasks; optional `key` demonstrates keyed vs round-robin partitioning |
 | E1 | `/queue-e1.html` | `GET /api/v1/demo/queue/live` | Receive tasks handled by worker-1 |
 | E2 | `/queue-e2.html` | `GET /api/v1/demo/queue/pull` | Pull tasks handled by worker-2 |
 | G | `/footprint-g.html` | `POST /api/v1/footprint`, `GET /footprint` / `/footprint/{userId}`, `GET /footprint/replay` | Log a userId-keyed action; read one user's live footprint, or all of them if the User ID field is left blank; replay everyone from offset 0 |

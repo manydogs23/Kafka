@@ -127,7 +127,8 @@ flowchart TB
 | Fanout groups are independent | `messaging.groups.analytics` / `notifications` | Gives each group its own full copy of every broadcast |
 | D / D1 / D2 have separate groups | `messaging.groups.orderPull.*` | Each browser inbox can pull every `NUMBER` event independently |
 | Replay uses a disposable group prefix | `messaging.groups.orderReplayPrefix` | Replay must not disturb live offsets |
-| `task-queue-topic` is round-robined manually | `KafkaProducerService.sendTaskToQueue()` | Avoids sticky partitioner bias that made E1 stay empty in demos |
+| `task-queue-topic` is round-robined manually when no key is given | `KafkaProducerService.sendTaskToQueue()` | Avoids sticky partitioner bias that made E1 stay empty in demos |
+| `task-queue-topic` also accepts an optional key | `KafkaProducerService.sendTaskToQueueWithKey()` | Contrasts with the no-key case: same key → same partition → same worker every time, instead of spread round-robin |
 | `order-events-topic` keeps infinite retention | `KafkaTopicConfig` | Replay from offset 0 must remain possible |
 | `user-footprint-topic` mirrors `order-events-topic` 1:1 | `UserFootprintListener` / `UserFootprintReplayService` / `UserFootprintStore` | Same event-log guarantees (keyed ordering, infinite retention, manual commit-after-apply, disposable replay group) apply directly to tracking what a user did |
 | Every `DemoController` action also logs a footprint event | `DemoController.logFootprint()` | So User G's page is a real cross-pattern activity trail, not a separate demo nobody feeds |

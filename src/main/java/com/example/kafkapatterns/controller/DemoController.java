@@ -152,9 +152,15 @@ public class DemoController {
         if (payload.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
+        String key = request.key() == null ? "" : request.key().trim();
         TaskMessage message = new TaskMessage(UUID.randomUUID().toString(), payload, Instant.now());
-        producerService.sendTaskToQueue(message);
-        logFootprint("F", "TASK_SUBMITTED", payload);
+        if (key.isEmpty()) {
+            producerService.sendTaskToQueue(message);
+            logFootprint("F", "TASK_SUBMITTED", payload);
+        } else {
+            producerService.sendTaskToQueueWithKey(key, message);
+            logFootprint("F", "TASK_SUBMITTED_KEYED", payload + " (key=" + key + ")");
+        }
         return ResponseEntity.accepted().body(message);
     }
 

@@ -31,15 +31,29 @@ public class KafkaProducerService {
     }
 
     /**
-     * Work-queue produce: rotate across partitions so competing consumers
-     * (E1/E2) both receive work in demos (avoids sticky partitioner bias).
+     * Work-queue produce, NO key: rotate across partitions so competing
+     * consumers (E1/E2) both receive work in demos (avoids sticky partitioner
+     * bias). Order across tasks is not preserved or implied.
      */
     public void sendTaskToQueue(TaskMessage message) {
         int partitions = rules.getPartitions().getTaskQueue();
         int partition = Math.floorMod(taskPartitionCounter.getAndIncrement(), partitions);
         String topic = rules.getTopics().getTaskQueue();
         kafkaTemplate.send(topic, partition, null, message);
-        log.info("-> [{}] queued task {} partition={}", topic, message.taskId(), partition);
+        log.info("-> [{}] queued task {} partition={} (no key)", topic, message.taskId(), partition);
+    }
+
+    /**
+     * Work-queue produce, WITH key: Kafka's partitioner hashes {@code key} to
+     * pick the partition, so every task sharing that key lands on the same
+     * partition every time -- and therefore the same worker in {@code
+     * worker-group} -- instead of being spread round-robin like {@link
+     * #sendTaskToQueue(TaskMessage)}.
+     */
+    public void sendTaskToQueueWithKey(String key, TaskMessage message) {
+        String topic = rules.getTopics().getTaskQueue();
+        kafkaTemplate.send(topic, key, message);
+        log.info("-> [{}] queued task {} key={}", topic, message.taskId(), key);
     }
 
     public void sendBroadcast(BroadcastMessage message) {

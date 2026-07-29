@@ -107,9 +107,14 @@ sequenceDiagram
     participant E1 as User E1
     participant E2 as User E2
 
-    F->>API: POST /api/v1/demo/queue/tasks
-    API->>P: sendTaskToQueue(task)
-    P->>K: publish to next partition
+    F->>API: POST /api/v1/demo/queue/tasks<br/>{ payload, key? }
+    alt key blank
+        API->>P: sendTaskToQueue(task)
+        P->>K: publish to next partition (round-robin)
+    else key present
+        API->>P: sendTaskToQueueWithKey(key, task)
+        P->>K: publish keyed (hash(key) picks the partition)
+    end
     API-->>F: 202 Accepted
 
     alt partition owned by worker-instance-1
@@ -128,11 +133,13 @@ sequenceDiagram
 
 | Step | Component | Action |
 |---|---|---|
-| 1 | User F | `POST /api/v1/demo/queue/tasks` |
-| 2 | `KafkaProducerService` | Publish to `task-queue-topic` with manual partition rotation |
+| 1 | User F | `POST /api/v1/demo/queue/tasks` with `payload`, optional `key` |
+| 2 | `KafkaProducerService` | No key: round-robins partitions manually. With key: lets Kafka hash the key to a partition |
 | 3 | `QueueWorkerListener` | Exactly one worker receives each task |
 | 4 | `QueuePushHub` / `QueuePullBuffer` | Route to E1 push or E2 pull |
 | 5 | `E1` / `E2` | Only one side sees a given task |
+
+**With vs without a key:** submit several tasks with no key and they'll bounce between E1 and E2 (round-robin across partitions). Submit several with the *same* key (e.g. `customer-7`) and they'll all land on the same partition — and therefore always the same worker — every time, because Kafka's partitioner hashes the key deterministically. That's the same mechanism `order-events-topic` (keyed by `orderId`) and `user-footprint-topic` (keyed by `userId`) rely on for per-entity ordering; this endpoint just lets you opt into it on a topic that's normally unkeyed, side by side, for comparison.
 
 ---
 
