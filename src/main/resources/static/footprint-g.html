@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User G — Footprint</title>
+  <link rel="stylesheet" href="/css/demo.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <span class="badge kafka">Event log · userId-keyed</span>
+      <h1>User G — operating footprint</h1>
+      <p>Log actions under a userId, then read that user's trail straight from the live projection — or replay the whole log from offset 0 to rebuild every user's footprint from scratch.</p>
+    </header>
+
+    <section class="panel">
+      <label for="userId">User ID</label>
+      <input id="userId" type="text" placeholder="user-42" value="user-42" />
+      <label for="action" class="stacked">Action</label>
+      <input id="action" type="text" placeholder="LOGIN, PAGE_VIEW, CHECKOUT, ..." />
+      <label for="details" class="stacked">Details</label>
+      <input id="details" type="text" placeholder="/checkout, referrer=email, ..." />
+      <div class="row">
+        <button id="log" class="kafka" type="button">Log action</button>
+      </div>
+      <div id="logStatus" class="status"></div>
+    </section>
+
+    <section class="panel">
+      <p class="hint">Uses the User ID field above. Leave it blank to show every user's live footprint instead of just one.</p>
+      <div class="row">
+        <button id="fetchMine" class="kafka" type="button">Fetch footprint</button>
+        <button id="clearMine" class="secondary" type="button">Clear list</button>
+      </div>
+      <div id="mineStatus" class="status">Idle — click Fetch when ready.</div>
+      <ul id="mineFeed" class="feed"></ul>
+    </section>
+
+    <section class="panel">
+      <p class="hint">Admin: rewinds a throwaway consumer to offset 0 and rebuilds every user's footprint from the full log.</p>
+      <div class="row">
+        <button id="replayAll" class="secondary" type="button">Replay everyone from offset 0</button>
+      </div>
+      <div id="replayStatus" class="status"></div>
+      <ul id="replayFeed" class="feed"></ul>
+    </section>
+
+    <p class="nav"><a href="/">← Home</a></p>
+  </div>
+
+  <script>
+    function fmtEvent(e) {
+      return e.action + (e.details ? ' · ' + e.details : '') + ' · ' + e.timestamp;
+    }
+
+    function renderList(ul, events, emptyText) {
+      ul.innerHTML = '';
+      if (!events.length) {
+        const li = document.createElement('li');
+        li.textContent = emptyText;
+        ul.appendChild(li);
+        return;
+      }
+      events.slice().reverse().forEach((e) => {
+        const li = document.createElement('li');
+        li.textContent = fmtEvent(e);
+        ul.appendChild(li);
+      });
+    }
+
+    function renderByUser(ul, byUser, emptyText) {
+      ul.innerHTML = '';
+      const userIds = Object.keys(byUser);
+      if (!userIds.length) {
+        const li = document.createElement('li');
+        li.textContent = emptyText;
+        ul.appendChild(li);
+        return userIds;
+      }
+      userIds.forEach((uid) => {
+        const li = document.createElement('li');
+        li.textContent = uid + ': ' + byUser[uid].map(fmtEvent).join('  |  ');
+        ul.appendChild(li);
+      });
+      return userIds;
+    }
+
+    const logStatus = document.getElementById('logStatus');
+    document.getElementById('log').addEventListener('click', async () => {
+      const userId = document.getElementById('userId').value.trim();
+      const action = document.getElementById('action').value.trim();
+      const details = document.getElementById('details').value.trim();
+      if (!userId || !action) {
+        logStatus.className = 'status err';
+        logStatus.textContent = 'User ID and Action are required.';
+        return;
+      }
+      logStatus.className = 'status';
+      logStatus.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/v1/footprint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, action, details })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const body = await res.json();
+        logStatus.className = 'status ok';
+        logStatus.textContent = 'Accepted · ' + fmtEvent(body);
+        document.getElementById('action').value = '';
+        document.getElementById('details').value = '';
+      } catch (e) {
+        logStatus.className = 'status err';
+        logStatus.textContent = 'Failed: ' + e.message;
+      }
+    });
+
+    const mineStatus = document.getElementById('mineStatus');
+    const mineFeed = document.getElementById('mineFeed');
+    document.getElementById('clearMine').addEventListener('click', () => {
+      mineFeed.innerHTML = '';
+      mineStatus.className = 'status';
+      mineStatus.textContent = 'List cleared.';
+    });
+    document.getElementById('fetchMine').addEventListener('click', async () => {
+      const userId = document.getElementById('userId').value.trim();
+      mineStatus.className = 'status';
+      mineStatus.textContent = 'Fetching…';
+      try {
+        if (userId) {
+          const res = await fetch('/api/v1/footprint/' + encodeURIComponent(userId));
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const events = await res.json();
+          renderList(mineFeed, events, 'No events yet for ' + userId + '.');
+          mineStatus.className = 'status ok';
+          mineStatus.textContent = events.length + ' event(s) for ' + userId + ' (live projection).';
+        } else {
+          const res = await fetch('/api/v1/footprint');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const byUser = await res.json();
+          const userIds = renderByUser(mineFeed, byUser, 'No footprint events logged yet.');
+          mineStatus.className = 'status ok';
+          mineStatus.textContent = 'No User ID entered — showing all ' + userIds.length + ' user(s) (live projection).';
+        }
+      } catch (e) {
+        mineStatus.className = 'status err';
+        mineStatus.textContent = 'Failed: ' + e.message;
+      }
+    });
+
+    const replayStatus = document.getElementById('replayStatus');
+    const replayFeed = document.getElementById('replayFeed');
+    document.getElementById('replayAll').addEventListener('click', async () => {
+      replayStatus.className = 'status';
+      replayStatus.textContent = 'Replaying from offset 0…';
+      try {
+        const res = await fetch('/api/v1/footprint/replay');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const byUser = await res.json();
+        const userIds = renderByUser(replayFeed, byUser, 'No footprint events in the log yet.');
+        replayStatus.className = 'status ok';
+        replayStatus.textContent = 'Rebuilt ' + userIds.length + ' user(s) from the full log.';
+      } catch (e) {
+        replayStatus.className = 'status err';
+        replayStatus.textContent = 'Failed: ' + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

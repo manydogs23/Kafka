@@ -42,4 +42,13 @@ public class KafkaTopicConfig {
                 .config(TopicConfig.RETENTION_MS_CONFIG, "-1")
                 .build();
     }
+
+    @Bean
+    public NewTopic userFootprintTopic() {
+        return TopicBuilder.name(rules.getTopics().getUserFootprint())
+                .partitions(rules.getPartitions().getUserFootprint())
+                .replicas(1)
+                .config(TopicConfig.RETENTION_MS_CONFIG, "-1")
+                .build();
+    }
 }

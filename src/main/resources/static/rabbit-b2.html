@@ -30,7 +30,7 @@
       li.appendChild(time);
       feed.prepend(li);
     }
-    const es = new EventSource('/api/v1/demo/rabbit/live');
+    const es = new EventSource('/api/v1/demo/rabbit/live?user=B2');
     es.addEventListener('connected', () => {
       statusEl.className = 'status ok';
       statusEl.textContent = 'Connected · waiting for User A…';

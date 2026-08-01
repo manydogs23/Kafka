@@ -6,6 +6,7 @@ import com.example.kafkapatterns.dto.NumberRequest;
 import com.example.kafkapatterns.dto.OrderEvent;
 import com.example.kafkapatterns.dto.TaskMessage;
 import com.example.kafkapatterns.dto.TaskPayloadRequest;
+import com.example.kafkapatterns.dto.UserFootprintEvent;
 import com.example.kafkapatterns.dto.WordsRequest;
 import com.example.kafkapatterns.live.KafkaPullBuffer;
 import com.example.kafkapatterns.live.QueuePullBuffer;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -36,6 +38,8 @@ import java.util.UUID;
  *   <li>Event-log pull: C → D / D1 / D2 (separate Kafka groups)</li>
  *   <li>Work queue: F → E1 (push) / E2 (pull), competing workers</li>
  * </ul>
+ * Every action here also appends to {@code user-footprint-topic} via
+ * {@link #logFootprint}, so User G's page reflects real activity from A-F.
  */
 @RestController
 @RequestMapping("/api/v1/demo")
@@ -62,6 +66,15 @@ public class DemoController {
         this.rules = rules;
     }
 
+    /**
+     * Every demo action also appends to {@code user-footprint-topic}, keyed by the
+     * demo persona (A, B, B1, ... F) that triggered it, so User G's footprint page
+     * doubles as a live, cross-pattern activity trail for the whole demo.
+     */
+    private void logFootprint(String userId, String action, String details) {
+        producerService.sendUserFootprintEvent(userId, new UserFootprintEvent(userId, action, details, Instant.now()));
+    }
+
     // --- broadcast-topic: User A → B / B1 / B2 --------------------------------
 
     @PostMapping("/rabbit/words")
@@ -72,12 +85,14 @@ public class DemoController {
         }
         BroadcastMessage message = new BroadcastMessage(UUID.randomUUID().toString(), words, Instant.now());
         producerService.sendBroadcast(message);
+        logFootprint("A", "WORDS_SUBMITTED", words);
         return ResponseEntity.accepted().body(message);
     }
 
     /** Shared SSE stream for Users B, B1, B2 (all open tabs get every fanout). */
     @GetMapping(path = "/rabbit/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter liveWords() {
+    public SseEmitter liveWords(@RequestParam(defaultValue = "B") String user) {
+        logFootprint(user, "SSE_SUBSCRIBED", "rabbit/live");
         return rabbitPushHub.subscribe();
     }
 
@@ -92,6 +107,7 @@ public class DemoController {
         String orderId = "numbers";
         OrderEvent event = new OrderEvent(orderId, "NUMBER", number, Instant.now());
         producerService.sendOrderEvent(orderId, event);
+        logFootprint("C", "NUMBER_SUBMITTED", number);
         return ResponseEntity.accepted().body(event);
     }
 
@@ -108,6 +124,7 @@ public class DemoController {
                     "Unknown pull user/inbox. Valid: " + kafkaPullBuffer.inboxes());
         }
         List<Map<String, Object>> messages = kafkaPullBuffer.drain(inbox);
+        logFootprint(inbox.toUpperCase(), "KAFKA_PULL", messages.size() + " message(s)");
         return ResponseEntity.ok(Map.of(
                 "user", inbox,
                 "count", messages.size(),
@@ -135,14 +152,22 @@ public class DemoController {
         if (payload.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
+        String key = request.key() == null ? "" : request.key().trim();
         TaskMessage message = new TaskMessage(UUID.randomUUID().toString(), payload, Instant.now());
-        producerService.sendTaskToQueue(message);
+        if (key.isEmpty()) {
+            producerService.sendTaskToQueue(message);
+            logFootprint("F", "TASK_SUBMITTED", payload);
+        } else {
+            producerService.sendTaskToQueueWithKey(key, message);
+            logFootprint("F", "TASK_SUBMITTED_KEYED", payload + " (key=" + key + ")");
+        }
         return ResponseEntity.accepted().body(message);
     }
 
     /** User E1: SSE — only tasks handled by worker-instance-1. */
     @GetMapping(path = "/queue/live", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter liveTasks() {
+        logFootprint("E1", "SSE_SUBSCRIBED", "queue/live");
         return queuePushHub.subscribe();
     }
 
@@ -150,6 +175,7 @@ public class DemoController {
     @GetMapping("/queue/pull")
     public ResponseEntity<Map<String, Object>> pullTasks() {
         List<Map<String, Object>> messages = queuePullBuffer.drain();
+        logFootprint("E2", "QUEUE_PULL", messages.size() + " message(s)");
         return ResponseEntity.ok(Map.of(
                 "count", messages.size(),
                 "messages", messages

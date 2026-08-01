@@ -9,11 +9,13 @@ messaging:
     taskQueue: task-queue-topic
     broadcast: broadcast-topic
     orderEvents: order-events-topic
+    userFootprint: user-footprint-topic
 
   partitions:
     taskQueue: 3
     broadcast: 3
     orderEvents: 3
+    userFootprint: 3
 
   groups:
     # Work queue: E1 and E2 share this group → compete (one task → one worker)
@@ -30,6 +32,10 @@ messaging:
       d2: demo-order-pull-d2
     # Prefix for disposable replay consumers (UUID is appended in code)
     orderReplayPrefix: order-events-replay-
+    # Live projection (UserFootprintStore), keyed by userId
+    userFootprintLive: user-footprint-live-group
+    # Prefix for disposable replay consumers (UUID is appended in code)
+    userFootprintReplayPrefix: user-footprint-replay-
 
   # Who is producer/consumer and which group / delivery they use
   users:
