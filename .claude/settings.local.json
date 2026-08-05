@@ -7,7 +7,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(mvn -q -o compile)",
       "Bash(mvn -q compile)",
-      "Bash(echo \"EXIT_CODE=$?\")"
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
     ]
   }
 }

@@ -11,7 +11,10 @@
       "Bash(curl -s -X POST http://localhost:8080/api/v1/footprint -H 'Content-Type: application/json' -d '{\"userId\":\"user-42\",\"action\":\"LOGIN\",\"details\":\"web\"}')",
       "Bash(curl -s -X POST http://localhost:8080/api/v1/footprint -H 'Content-Type: application/json' -d '{\"userId\":\"user-42\",\"action\":\"PAGE_VIEW\",\"details\":\"/checkout\"}')",
       "Bash(curl -s http://localhost:8080/api/v1/footprint/user-42)",
-      "Bash(curl -s http://localhost:8080/api/v1/footprint/replay)"
+      "Bash(curl -s http://localhost:8080/api/v1/footprint/replay)",
+      "Bash(jar tf *)",
+      "Bash(mvn dependency:tree*)",
+      "Bash(tasklist *)"
     ]
   }
 }
